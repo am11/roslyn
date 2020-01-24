@@ -428,6 +428,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 If IsScriptCommandLineParser Then
                     Select Case name
+                        Case "-"
+                            If Console.IsInputRedirected Then
+                                sourceFiles.Add(ToCommandLineSourceFile("stdin" + ScriptFileExtension, isInputRedirected:=True))
+                                hasSourceFiles = True
+                            Else
+                                AddDiagnostic(diagnostics, ERRID.ERR_StdInOptionProvidedButConsoleInputIsNotRedirected)
+                            End If
+                            Continue For
+
                         Case "i", "i+"
                             If value IsNot Nothing Then
                                 AddDiagnostic(diagnostics, ERRID.ERR_SwitchNeedsBool, "i")
@@ -1206,6 +1215,16 @@ lVbRuntimePlus:
                             For Each path In ParseSeparatedFileArgument(value, baseDirectory, diagnostics)
                                 embeddedFiles.Add(ToCommandLineSourceFile(path))
                             Next
+                            Continue For
+
+                        Case "-"
+                            If Not Console.IsInputRedirected Then
+                                AddDiagnostic(diagnostics, ERRID.ERR_StdInOptionProvidedButConsoleInputIsNotRedirected)
+                                Continue For
+                            End If
+
+                            sourceFiles.Add(ToCommandLineSourceFile("stdin" + RegularFileExtension, isInputRedirected:=True))
+                            hasSourceFiles = True
                             Continue For
                     End Select
                 End If

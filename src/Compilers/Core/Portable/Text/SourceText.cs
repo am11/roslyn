@@ -181,7 +181,7 @@ namespace Microsoft.CodeAnalysis.Text
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            if (!stream.CanRead || !stream.CanSeek)
+            if (!stream.CanRead)
             {
                 throw new ArgumentException(CodeAnalysisResources.StreamMustSupportReadAndSeek, nameof(stream));
             }
@@ -190,10 +190,13 @@ namespace Microsoft.CodeAnalysis.Text
 
             encoding = encoding ?? s_utf8EncodingWithNoBOM;
 
-            // If the resulting string would end up on the large object heap, then use LargeEncodedText.
-            if (encoding.GetMaxCharCountOrThrowIfHuge(stream) >= LargeObjectHeapLimitInChars)
+            if (stream.CanSeek)
             {
-                return LargeText.Decode(stream, encoding, checksumAlgorithm, throwIfBinaryDetected, canBeEmbedded);
+                // If the resulting string would end up on the large object heap, then use LargeEncodedText.
+                if (encoding.GetMaxCharCountOrThrowIfHuge(stream) >= LargeObjectHeapLimitInChars)
+                {
+                    return LargeText.Decode(stream, encoding, checksumAlgorithm, throwIfBinaryDetected, canBeEmbedded);
+                }
             }
 
             string text = Decode(stream, encoding, out encoding);
@@ -280,14 +283,18 @@ namespace Microsoft.CodeAnalysis.Text
         {
             RoslynDebug.Assert(stream != null);
             RoslynDebug.Assert(encoding != null);
+            int length = 4096;
 
-            stream.Seek(0, SeekOrigin.Begin);
-
-            int length = (int)stream.Length;
-            if (length == 0)
+            if (stream.CanSeek)
             {
-                actualEncoding = encoding;
-                return string.Empty;
+                stream.Seek(0, SeekOrigin.Begin);
+
+                length = (int)stream.Length;
+                if (length == 0)
+                {
+                    actualEncoding = encoding;
+                    return string.Empty;
+                }
             }
 
             // Note: We are setting the buffer size to 4KB instead of the default 1KB. That's
